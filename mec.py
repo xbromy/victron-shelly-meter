@@ -23,21 +23,45 @@ import time
 
 global demo
 demo = 1
+global mec_is_init
+mec_is_init = 0
 
 def read_settings() :
 	parser = SafeConfigParser()
 	parser.read('mec.ini')
-	global setting_url, setting_user, setting_pw
+	global setting_url, setting_user, setting_pw, setting_statusurl
 	setting_url = parser.get('MEC', 'url')
+	setting_statusurl = parser.get('MEC', 'statusurl')
 	setting_user = parser.get('MEC', 'username')
 	setting_pw = parser.get('MEC', 'password')
 
-def mec_read_example() :
-	with open("example_mec.json") as f:
+def mec_read_example(filename) :
+	with open(filename) as f:
 		data = json.load(f)
+	#print(data)
 	return data
 
 def mec_parse_data( data ) :
+	global mec, mec_is_init
+
+	# read same variables only the first time
+	if mec_is_init == 0:
+		#mec.set('/ProductName', str(jsonstr['hardware']))
+		mec_is_init = 1
+
+	mec.set('/Ac/Power', (data['PT'],0))
+	mec.set('/Ac/Current', (data['IN0']), 1)
+	mec.set('/Ac/Voltage', (data['VT']))
+	mec.set('/Ac/L1/Current', (data['IA']), 1)
+	mec.set('/Ac/L1/Voltage', (data['VA']))
+	mec.set('/Ac/L1/Power', (data['PA']))
+	mec.set('/Ac/L2/Current', (data['IB']), 1)
+	mec.set('/Ac/L2/Voltage', (data['VB']))
+	mec.set('/Ac/L2/Power', (data['PB']))
+	mec.set('/Ac/L3/Current', (data['IC']), 1)
+	mec.set('/Ac/L3/Voltage', (data['VC']))
+	mec.set('/Ac/L3/Power', (data['PC']))
+
 	powertotal = data['PT']
 	time = data['TIME']
 	print("++++++++++")
@@ -50,6 +74,12 @@ def mec_parse_data( data ) :
 
 def mec_data_read_cb( jsonstr ) :
 	mec_parse_data ( jsonstr )
+	return
+
+def mec_status_read_cb( jsonstr ) :
+	global mec
+	mec = VenusMeter('mec_tcp_50','tcp REST',50,'0','Mec Meter', '0','0')
+	mec.set('/ProductName', str(jsonstr['hardware']))
 	return
 
 def mec_read_data ( url ) :
@@ -69,8 +99,29 @@ def mec_read_data ( url ) :
 		else:
 			print("Failure code:"+ str(response.status_code))
 	else:
-		data = mec_read_example()
+		data = mec_read_example("example_mec_data.json")
 		mec_data_read_cb(data)
+	return
+
+def mec_read_status ( url ) :
+	global demo
+
+	if demo == 0:
+		response = requests.get( url ) # no auth an status read
+		# For successful API call, response code will be 200 (OK)
+		if(response.ok):
+			print("code:"+ str(response.status_code))
+			print("******************")
+			print("headers:"+ str(response.headers))
+			print("******************")
+			#print("content text:"+ str(response.text))
+			#print("******************")
+			mec_status_read_cb( jsonstr=response.json() )
+		else:
+			print("Failure code:"+ str(response.status_code))
+	else:
+		data = mec_read_example("example_mec_status.json")
+		mec_status_read_cb(data)
 	return
 
 def mec_update_cyclic(run_event) :
@@ -85,9 +136,13 @@ def mec_update_cyclic(run_event) :
 
 global setting_url
 DBusGMainLoop(set_as_default=True)
-mec = VenusMeter('mec_tcp_50','tcp REST',50,'1234567','Mec Meter', '1.0','0.1' )
+#if demo == 0:
+#mec = VenusMeter('mec_tcp_50','tcp REST',50,'1234567','Mec Meter', '1.0','0.1' )
 read_settings()
 print("Using " + setting_url + " user: " + setting_user)
+#else:
+#mec = VenusMeter('mec_tcp_50','DEMO File',50,'1234567','Mec Meter', '1.0','0.1' )
+mec_read_status(setting_url) # first read
 
 try:
 	run_event = threading.Event()
