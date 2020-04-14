@@ -21,19 +21,53 @@ import sys
 import threading
 import time
 
+class DevState:
+	WaitForDevice = 0
+	Connect = 1
+	Connected = 2
+
+class DevStatistics:
+	connection_ok = 0
+	connection_ko = 0
+	parse_error = 0
+	last_connection_errors = 0 # reset every ok read
+	last_time = 0
+
+class Mec:
+	ip = []
+	url = []
+	urlstate = []
+	user = []
+	password = []
+	stats = DevStatistics
+	intervall = []
+
 global demo
-demo = 1
+demo = 0
 global mec_is_init
 mec_is_init = 0
+global dev_state
+dev_state = DevState.WaitForDevice
+
+def push_statistics() :
+	global mec
+
+	mec.set('/stats/connection_ok', Mec.stats.connection_ok)
+	mec.set('/stats/connection_error', Mec.stats.connection_ko)
+	mec.set('/stats/last_connection_errors', Mec.stats.last_connection_errors)
+	mec.set('/stats/parse_error', Mec.stats.parse_error)
+
 
 def read_settings() :
 	parser = SafeConfigParser()
 	parser.read('mec.ini')
-	global setting_url, setting_user, setting_pw, setting_statusurl
-	setting_url = parser.get('MEC', 'url')
-	setting_statusurl = parser.get('MEC', 'statusurl')
-	setting_user = parser.get('MEC', 'username')
-	setting_pw = parser.get('MEC', 'password')
+
+	Mec.ip = parser.get('MEC', 'ip')
+	Mec.url = parser.get('MEC', 'url')
+	Mec.statusurl = parser.get('MEC', 'statusurl')
+	Mec.user = parser.get('MEC', 'username')
+	Mec.password = parser.get('MEC', 'password')
+	Mec.intervall = float(parser.get('MEC', 'intervall'))
 
 def mec_read_example(filename) :
 	with open(filename) as f:
@@ -49,100 +83,136 @@ def mec_parse_data( data ) :
 		#mec.set('/ProductName', str(jsonstr['hardware']))
 		mec_is_init = 1
 
-	mec.set('/Ac/Power', (data['PT'],0))
-	mec.set('/Ac/Current', (data['IN0']), 1)
-	mec.set('/Ac/Voltage', (data['VT']))
-	mec.set('/Ac/L1/Current', (data['IA']), 1)
-	mec.set('/Ac/L1/Voltage', (data['VA']))
-	mec.set('/Ac/L1/Power', (data['PA']))
-	mec.set('/Ac/L2/Current', (data['IB']), 1)
-	mec.set('/Ac/L2/Voltage', (data['VB']))
-	mec.set('/Ac/L2/Power', (data['PB']))
-	mec.set('/Ac/L3/Current', (data['IC']), 1)
-	mec.set('/Ac/L3/Voltage', (data['VC']))
-	mec.set('/Ac/L3/Power', (data['PC']))
-
-	powertotal = data['PT']
 	time = data['TIME']
-	print("++++++++++")
-	print("POWER Phase A: " + str(data['PA']) + "W")
-	print("POWER Phase B: " + str(data['PB']) + "W")
-	print("POWER Phase C: " + str(data['PC']) + "W")
-	print("POWER Total: " + str(data['PT']) + "W")
-	print("Time: " + str(data['TIME']) + "ms")
-	print("MEC Status: " + str(data['STATUS']))
+	if Mec.stats.last_time == time:
+		mec.inc('/stats/repeated_values')
+		mec.inc('/stats/last_repeated_values')
+		print('got repeated value')
+	else:
+		Mec.stats.last_time = time
+		mec.set('/stats/last_repeated_values', 0)
+
+		mec.set('/Ac/Power', (data['PT']))
+		mec.set('/Ac/Current', (data['IN0']), 1)
+		mec.set('/Ac/Voltage', (data['VT']))
+		mec.set('/Ac/L1/Current', (data['IA']), 1)
+		mec.set('/Ac/L1/Voltage', (data['VA']))
+		mec.set('/Ac/L1/Power', (data['PA']))
+		mec.set('/Ac/L2/Current', (data['IB']), 1)
+		mec.set('/Ac/L2/Voltage', (data['VB']))
+		mec.set('/Ac/L2/Power', (data['PB']))
+		mec.set('/Ac/L3/Current', (data['IC']), 1)
+		mec.set('/Ac/L3/Voltage', (data['VC']))
+		mec.set('/Ac/L3/Power', (data['PC']))
+
+		powertotal = data['PT']
+		print("++++++++++")
+		print("POWER Phase A: " + str(data['PA']) + "W")
+		print("POWER Phase B: " + str(data['PB']) + "W")
+		print("POWER Phase C: " + str(data['PC']) + "W")
+		print("POWER Total: " + str(data['PT']) + "W")
+		print("Time: " + str(data['TIME']) + "ms")
+		print("MEC Status: " + str(data['STATUS']))
+
+		#Mec.stats.parse_error += 1
 
 def mec_data_read_cb( jsonstr ) :
 	mec_parse_data ( jsonstr )
 	return
 
-def mec_status_read_cb( jsonstr ) :
+def mec_status_read_cb( jsonstr, init) :
 	global mec
-	mec = VenusMeter('mec_tcp_50','tcp REST',50,'0','Mec Meter', '0','0')
-	mec.set('/ProductName', str(jsonstr['hardware']))
+	if init:
+		mec = VenusMeter('mec_tcp_50','tcp:' + Mec.ip, 50,'0',  str(jsonstr['hardware']), str(jsonstr['software']),'0.1')
+		mec.set('/Mgmt/intervall', Mec.intervall, 1)
 	return
 
-def mec_read_data ( url ) :
-	global setting_user, setting_pw, demo
-
-	if demo == 0:
-		response = requests.get( url, verify=False, auth=HTTPBasicAuth(setting_user, setting_pw))
-		# For successful API call, response code will be 200 (OK)
-		if(response.ok):
-			print("code:"+ str(response.status_code))
-			print("******************")
-			print("headers:"+ str(response.headers))
-			print("******************")
-			#print("content text:"+ str(response.text))
-			#print("******************")
-			mec_data_read_cb( jsonstr=response.json() )
-		else:
-			print("Failure code:"+ str(response.status_code))
-	else:
-		data = mec_read_example("example_mec_data.json")
-		mec_data_read_cb(data)
-	return
-
-def mec_read_status ( url ) :
+def mec_read_data() :
 	global demo
 
 	if demo == 0:
-		response = requests.get( url ) # no auth an status read
+		response = requests.get( Mec.url, verify=False, auth=HTTPBasicAuth(Mec.user, Mec.password))
 		# For successful API call, response code will be 200 (OK)
 		if(response.ok):
-			print("code:"+ str(response.status_code))
-			print("******************")
-			print("headers:"+ str(response.headers))
-			print("******************")
+			#print("code:"+ str(response.status_code))
+			#print("******************")
+			#print("headers:"+ str(response.headers))
+			#print("******************")
 			#print("content text:"+ str(response.text))
 			#print("******************")
-			mec_status_read_cb( jsonstr=response.json() )
+			Mec.stats.connection_ok += 1
+			Mec.stats.last_connection_errors = 0
+			mec_data_read_cb( jsonstr=response.json() )
+			return 0
 		else:
 			print("Failure code:"+ str(response.status_code))
+			Mec.stats.connection_ko += 1
+			Mec.stats.stats.last_connection_errors += 1
+			return 1
+	else:
+		data = mec_read_example("example_mec_data.json")
+		Mec.stats.connection_ok += 1
+		mec_data_read_cb(data)
+		return 0
+	return 0
+
+def mec_read_status(init) :
+	global demo
+
+	if demo == 0:
+		response = requests.get( Mec.statusurl ) # no auth an status read
+		# For successful API call, response code will be 200 (OK)
+		if(response.ok):
+			#print("code:"+ str(response.status_code))
+			#print("******************")
+			#print("headers:"+ str(response.headers))
+			#print("******************")
+			#print("content text:"+ str(response.text))
+			#print("******************")
+			mec_status_read_cb( jsonstr=response.json(), init=init )
+			return 0
+		else:
+			print("Failure code:"+ str(response.status_code))
+			return 1
 	else:
 		data = mec_read_example("example_mec_status.json")
-		mec_status_read_cb(data)
-	return
+		mec_status_read_cb(data, init)
+		return 0
+	return 0
 
 def mec_update_cyclic(run_event) :
-	global setting_url
+	global dev_state, mec
 
 	while run_event.is_set():
 		print("Thread: doing")
-		mec_read_data( setting_url )
-		time.sleep(1)
-	print("Thread: Exit")
+		if dev_state > DevState.WaitForDevice:
+			push_statistics()
+			intervall = mec.get('/Mgmt/intervall')
+		else:
+			intervall = Mec.intervall
+
+		if Mec.stats.last_connection_errors > 60:
+			print('Lost connection to mec, reset')
+			dev_state = DevState.Connect
+			Mec.stats.last_connection_errors = 0
+
+		if dev_state == DevState.WaitForDevice:
+			if mec_read_status(init=1) == 0:
+				dev_state = DevState.Connect
+		elif dev_state == DevState.Connect:
+			if mec_read_status(init=0) == 0:
+				dev_state = DevState.Connected
+		elif dev_state == DevState.Connected:
+			mec_read_data()
+		else:
+			dev_state = DevState.WaitForDevice
+
+		time.sleep(intervall)
 	return
 
-global setting_url
 DBusGMainLoop(set_as_default=True)
-#if demo == 0:
-#mec = VenusMeter('mec_tcp_50','tcp REST',50,'1234567','Mec Meter', '1.0','0.1' )
 read_settings()
-print("Using " + setting_url + " user: " + setting_user)
-#else:
-#mec = VenusMeter('mec_tcp_50','DEMO File',50,'1234567','Mec Meter', '1.0','0.1' )
-mec_read_status(setting_url) # first read
+print("Using " + Mec.url + " user: " + Mec.user)
 
 try:
 	run_event = threading.Event()
