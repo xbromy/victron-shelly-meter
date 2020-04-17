@@ -108,6 +108,16 @@ def mec_parse_data( data ) :
 		mec.set('/Ac/L3/Voltage', (data['VC']))
 		mec.set('/Ac/L3/Power', (data['PC']))
 
+		mec.set('/Ac/L1/Energy/Forward', (data['EFAA']/1000))
+		mec.set('/Ac/L1/Energy/Reverse', (data['ERAA']/1000))
+		mec.set('/Ac/L2/Energy/Forward', (data['EFAB']/1000))
+		mec.set('/Ac/L2/Energy/Reverse', (data['ERAB']/1000))
+		mec.set('/Ac/L3/Energy/Forward', (data['EFAC']/1000))
+		mec.set('/Ac/L3/Energy/Reverse', (data['ERAC']/1000))
+
+		mec.set('/Ac/Energy/Forward', (data['EFAT']/1000))
+		mec.set('/Ac/Energy/Reverse', (data['ERAC']/1000))
+
 		powertotal = data['PT']
 		print("++++++++++")
 		print("POWER Phase A: " + str(data['PA']) + "W")
