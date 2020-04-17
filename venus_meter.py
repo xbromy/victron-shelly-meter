@@ -85,12 +85,14 @@ class VenusMeter :
 		self.dbusservice.add_path('/stats/repeated_values', 0, gettextcallback=_x, writeable=True)
 		self.dbusservice.add_path('/stats/last_connection_errors', 0, gettextcallback=_x, writeable=True)
 		self.dbusservice.add_path('/stats/last_repeated_values', 0, gettextcallback=_x, writeable=True)
+		self.dbusservice.add_path('/stats/reconnect', 0, gettextcallback=_x)
 		self.dbusservice.add_path('/Mgmt/intervall', 1, gettextcallback=_s, writeable=True)
 
 	def invalidate() :
 		self.set('/Ac/L1/Power',[])
 		self.set('/Ac/L2/Power',[])
 		self.set('/Ac/L3/Power',[])
+		self.set('/Ac/Power',[])
 
 	def set(self, name, value, round_digits=0) :
 		#print(str(name) + ' ' + str(value))

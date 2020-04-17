@@ -32,6 +32,7 @@ class DevStatistics:
 	parse_error = 0
 	last_connection_errors = 0 # reset every ok read
 	last_time = 0
+	reconnect = 0
 
 class Mec:
 	ip = []
@@ -41,6 +42,7 @@ class Mec:
 	password = []
 	stats = DevStatistics
 	intervall = []
+	max_retries = 60
 
 global demo
 demo = 0
@@ -56,6 +58,7 @@ def push_statistics() :
 	mec.set('/stats/connection_error', Mec.stats.connection_ko)
 	mec.set('/stats/last_connection_errors', Mec.stats.last_connection_errors)
 	mec.set('/stats/parse_error', Mec.stats.parse_error)
+	mec.set('/stats/reconnect', Mec.stats.reconnect)
 
 
 def read_settings() :
@@ -130,24 +133,26 @@ def mec_status_read_cb( jsonstr, init) :
 def mec_read_data() :
 	global demo
 
+	err = 0
 	if demo == 0:
-		response = requests.get( Mec.url, verify=False, auth=HTTPBasicAuth(Mec.user, Mec.password))
-		# For successful API call, response code will be 200 (OK)
-		if(response.ok):
-			#print("code:"+ str(response.status_code))
-			#print("******************")
-			#print("headers:"+ str(response.headers))
-			#print("******************")
-			#print("content text:"+ str(response.text))
-			#print("******************")
-			Mec.stats.connection_ok += 1
-			Mec.stats.last_connection_errors = 0
-			mec_data_read_cb( jsonstr=response.json() )
-			return 0
-		else:
-			print("Failure code:"+ str(response.status_code))
+		try:
+			response = requests.get( Mec.url, verify=False, auth=HTTPBasicAuth(Mec.user, Mec.password))
+			# For successful API call, response code will be 200 (OK)
+			if(response.ok):
+				#print("code:"+ str(response.status_code))
+				#print("******************")
+				#print("headers:"+ str(response.headers))
+				#print("******************")
+				#print("content text:"+ str(response.text))
+				#print("******************")
+				Mec.stats.connection_ok += 1
+				Mec.stats.last_connection_errors = 0
+				mec_data_read_cb( jsonstr=response.json() )
+				return 0
+		except (requests.exceptions.HTTPError, requests.exceptions.RequestException):
+			print('Error reading from ' + Mec.url)
 			Mec.stats.connection_ko += 1
-			Mec.stats.stats.last_connection_errors += 1
+			Mec.stats.last_connection_errors += 1
 			return 1
 	else:
 		data = mec_read_example("example_mec_data.json")
@@ -160,7 +165,15 @@ def mec_read_status(init) :
 	global demo
 
 	if demo == 0:
-		response = requests.get( Mec.statusurl ) # no auth an status read
+		try:
+			response = requests.get( Mec.statusurl ) # no auth an status read
+		except requests.exceptions.HTTPError:
+			print('Http Error reading from ' + Mec.statusurl)
+			return 1
+		except requests.exceptions.RequestException:
+			print('Request Error reading from ' + Mec.statusurl)
+			return 1
+
 		# For successful API call, response code will be 200 (OK)
 		if(response.ok):
 			#print("code:"+ str(response.status_code))
@@ -191,10 +204,11 @@ def mec_update_cyclic(run_event) :
 		else:
 			intervall = Mec.intervall
 
-		if Mec.stats.last_connection_errors > 60:
+		if Mec.stats.last_connection_errors > Mec.max_retries):
 			print('Lost connection to mec, reset')
 			dev_state = DevState.Connect
 			Mec.stats.last_connection_errors = 0
+			Mec.stats.reconnect += 1
 
 		if dev_state == DevState.WaitForDevice:
 			if mec_read_status(init=1) == 0:
