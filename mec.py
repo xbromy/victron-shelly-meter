@@ -204,12 +204,12 @@ def mec_update_cyclic(run_event) :
 		else:
 			intervall = Mec.intervall
 
-		if Mec.stats.last_connection_errors > Mec.max_retries):
+		if Mec.stats.last_connection_errors > Mec.max_retries:
 			print('Lost connection to mec, reset')
 			dev_state = DevState.Connect
 			Mec.stats.last_connection_errors = 0
 			Mec.stats.reconnect += 1
-			intervall = mec.set('/Connected', 0)
+			mec.set('/Connected', 0)
 
 		if dev_state == DevState.WaitForDevice:
 			if mec_read_status(init=1) == 0:
@@ -217,7 +217,7 @@ def mec_update_cyclic(run_event) :
 		elif dev_state == DevState.Connect:
 			if mec_read_status(init=0) == 0:
 				dev_state = DevState.Connected
-				intervall = mec.set('/Connected', 1)
+				mec.set('/Connected', 1)
 		elif dev_state == DevState.Connected:
 			mec_read_data()
 		else:
