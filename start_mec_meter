@@ -1,0 +1,1 @@
+(./mec.py  > /dev/null) &
