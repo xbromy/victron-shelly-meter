@@ -116,7 +116,7 @@ def mec_parse_data( data ) :
 		mec.set('/Ac/L3/Energy/Reverse', (data['ERAC']/1000))
 
 		mec.set('/Ac/Energy/Forward', (data['EFAT']/1000))
-		mec.set('/Ac/Energy/Reverse', (data['ERAC']/1000))
+		mec.set('/Ac/Energy/Reverse', (data['ERAT']/1000))
 
 		powertotal = data['PT']
 		print("++++++++++")
