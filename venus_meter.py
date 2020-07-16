@@ -21,33 +21,58 @@ from vedbus import VeDbusService
 #def main(argv):
 #	global dbusObjects
 class VenusMeter :
+	devname = []
+	pversion = []
+	connection = []
+	instance = []
+	product = []
+	firmwarev = []
 	dbusservice = []
+	serial = []
+	disable_charge_state_old = 0
+	disable_feedin_state_old = 0
 
 	def __init__(self, dev, connection, instance, serial, product, firmwarev, pversion) :
 		#VERSION = '0.1'
 
 		print(__file__ + " starting up")
-	#	instance = 50 + 0
-
+		self.devname = dev
+		self.connection = connection
+		self.instance = instance
+		self.serial = serial
+		self.product = product
+		self.firmwarev = firmwarev
+		self.pversion = pversion
 		# Have a mainloop, so we can send/receive asynchronous calls to and from dbus
 		#DBusGMainLoop(set_as_default=True)
 
+	def invalidate(self) :
+		self.set('/Ac/L1/Power',[])
+		self.set('/Ac/L2/Power',[])
+		self.set('/Ac/L3/Power',[])
+		self.set('/Ac/Power',[])
+		self.set('/Connected',0)
+		self.dbusservice.__del__()  # explicitly call __del__(), instead of waiting for gc
+		self.dbusservice = 0
+		print('Removed device ' + self.devname + ' from dbus')
+
+	def validate(self) :
 		#Put ourselves on to the dbus
-		self.dbusservice = VeDbusService('com.victronenergy.grid.' + dev)
+		self.dbusservice = VeDbusService('com.victronenergy.grid.' + self.devname)
 
 		# Most simple and short way to add an object with an initial value of 5.
 		#	dbusservice.add_path('/Ac/Power', value=1000, description='Total power', writeable=False)
 		#	dbusservice.add_path('/DeviceType', value=1000, description='Total power', writeable=False)
 		# Add objects required by ve-api
 		self.dbusservice.add_path('/Mgmt/ProcessName', __file__)
-		self.dbusservice.add_path('/Mgmt/ProcessVersion', pversion)
-		self.dbusservice.add_path('/Mgmt/Connection', connection) # todo
-		self.dbusservice.add_path('/DeviceInstance', instance)
+		self.dbusservice.add_path('/Mgmt/ProcessVersion', self.pversion)
+		self.dbusservice.add_path('/Mgmt/Connection', self.connection) # todo
+		self.dbusservice.add_path('/DeviceInstance', self.instance)
 		self.dbusservice.add_path('/ProductId', 0xFFFF) # 0xB012 ?
-		self.dbusservice.add_path('/ProductName', product)
+		self.dbusservice.add_path('/ProductName', self.product)
 		#self.dbusservice.add_path('/CustomName', "PLC Mec meter")
-		self.dbusservice.add_path('/FirmwareVersion', firmwarev)
-		self.dbusservice.add_path('/Serial', serial)
+		self.dbusservice.add_path('/FirmwareVersion', self.firmwarev)
+		self.dbusservice.add_path('/Serial', self.serial)
 		self.dbusservice.add_path('/Connected', 1, writeable=True)
 		self.dbusservice.add_path('/ErrorCode', '(0) No Error')
 
@@ -88,11 +113,8 @@ class VenusMeter :
 		self.dbusservice.add_path('/stats/reconnect', 0, gettextcallback=_x)
 		self.dbusservice.add_path('/Mgmt/intervall', 1, gettextcallback=_s, writeable=True)
 
-	def invalidate() :
-		self.set('/Ac/L1/Power',[])
-		self.set('/Ac/L2/Power',[])
-		self.set('/Ac/L3/Power',[])
-		self.set('/Ac/Power',[])
+		self.set('/Connected',1)
+		print('Added device ' + self.devname + ' to dbus')
 
 	def set(self, name, value, round_digits=0) :
 		#print(str(name) + ' ' + str(value))

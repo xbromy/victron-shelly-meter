@@ -137,7 +137,6 @@ def mec_status_read_cb( jsonstr, init) :
 	global mec
 	if init:
 		mec = VenusMeter('mec_tcp_50','tcp:' + Mec.ip, 50,'0',  str(jsonstr['hardware']), str(jsonstr['software']),'0.1')
-		mec.set('/Mgmt/intervall', Mec.intervall, 1)
 	return
 
 def mec_read_data() :
@@ -156,7 +155,8 @@ def mec_read_data() :
 				#print("content text:"+ str(response.text))
 				#print("******************")
 				Mec.stats.connection_ok += 1
-				Mec.stats.last_connection_errors = 0
+				if Mec.stats.last_connection_errors > 0:
+					Mec.stats.last_connection_errors = 0
 				mec_data_read_cb( jsonstr=response.json() )
 				return 0
 		except (requests.exceptions.HTTPError, requests.exceptions.RequestException):
@@ -208,7 +208,7 @@ def mec_update_cyclic(run_event) :
 
 	while run_event.is_set():
 		print("Thread: doing")
-		if dev_state > DevState.WaitForDevice:
+		if dev_state >= DevState.Connected:
 			push_statistics()
 			intervall = mec.get('/Mgmt/intervall')
 		else:
@@ -220,6 +220,7 @@ def mec_update_cyclic(run_event) :
 			Mec.stats.last_connection_errors = 0
 			Mec.stats.reconnect += 1
 			mec.set('/Connected', 0)
+			mec.invalidate()
 
 		if dev_state == DevState.WaitForDevice:
 			if mec_read_status(init=1) == 0:
@@ -227,6 +228,7 @@ def mec_update_cyclic(run_event) :
 		elif dev_state == DevState.Connect:
 			if mec_read_status(init=0) == 0:
 				dev_state = DevState.Connected
+				mec.validate()
 				mec.set('/Connected', 1)
 		elif dev_state == DevState.Connected:
 			mec_read_data()
