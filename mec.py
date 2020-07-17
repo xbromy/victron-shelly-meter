@@ -42,7 +42,7 @@ class Mec:
 	password = []
 	stats = DevStatistics
 	intervall = []
-	max_retries = 60
+	max_retries = 10
 
 global demo
 demo = 0
@@ -145,7 +145,7 @@ def mec_read_data() :
 	err = 0
 	if demo == 0:
 		try:
-			response = requests.get( Mec.url, verify=False, auth=HTTPBasicAuth(Mec.user, Mec.password))
+			response = requests.get( Mec.url, verify=False, auth=HTTPBasicAuth(Mec.user, Mec.password), timeout=2)
 			# For successful API call, response code will be 200 (OK)
 			if(response.ok):
 				#print("code:"+ str(response.status_code))
