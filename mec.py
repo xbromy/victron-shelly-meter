@@ -42,7 +42,7 @@ class Mec:
 	password = []
 	stats = DevStatistics
 	intervall = []
-	max_retries = 60
+	max_retries = 10
 
 global demo
 demo = 0
@@ -108,15 +108,15 @@ def mec_parse_data( data ) :
 		mec.set('/Ac/L3/Voltage', (data['VC']))
 		mec.set('/Ac/L3/Power', (data['PC']))
 
-		mec.set('/Ac/L1/Energy/Forward', (data['EFAA']/1000))
-		mec.set('/Ac/L1/Energy/Reverse', (data['ERAA']/1000))
-		mec.set('/Ac/L2/Energy/Forward', (data['EFAB']/1000))
-		mec.set('/Ac/L2/Energy/Reverse', (data['ERAB']/1000))
-		mec.set('/Ac/L3/Energy/Forward', (data['EFAC']/1000))
-		mec.set('/Ac/L3/Energy/Reverse', (data['ERAC']/1000))
+		mec.set('/Ac/L1/Energy/Forward', (float(data['EFAA'])/1000), 2)
+		mec.set('/Ac/L1/Energy/Reverse', (float(data['ERAA'])/1000), 2)
+		mec.set('/Ac/L2/Energy/Forward', (float(data['EFAB'])/1000), 2)
+		mec.set('/Ac/L2/Energy/Reverse', (float(data['ERAB'])/1000), 2)
+		mec.set('/Ac/L3/Energy/Forward', (float(data['EFAC'])/1000), 2)
+		mec.set('/Ac/L3/Energy/Reverse', (float(data['ERAC'])/1000), 2)
 
-		mec.set('/Ac/Energy/Forward', (data['EFAT']/1000))
-		mec.set('/Ac/Energy/Reverse', (data['ERAC']/1000))
+		mec.set('/Ac/Energy/Forward', (float(data['EFAT'])/1000), 2)
+		mec.set('/Ac/Energy/Reverse', (float(data['ERAT'])/1000), 2)
 
 		powertotal = data['PT']
 		print("++++++++++")
@@ -137,7 +137,6 @@ def mec_status_read_cb( jsonstr, init) :
 	global mec
 	if init:
 		mec = VenusMeter('mec_tcp_50','tcp:' + Mec.ip, 50,'0',  str(jsonstr['hardware']), str(jsonstr['software']),'0.1')
-		mec.set('/Mgmt/intervall', Mec.intervall, 1)
 	return
 
 def mec_read_data() :
@@ -146,7 +145,7 @@ def mec_read_data() :
 	err = 0
 	if demo == 0:
 		try:
-			response = requests.get( Mec.url, verify=False, auth=HTTPBasicAuth(Mec.user, Mec.password))
+			response = requests.get( Mec.url, verify=False, auth=HTTPBasicAuth(Mec.user, Mec.password), timeout=2)
 			# For successful API call, response code will be 200 (OK)
 			if(response.ok):
 				#print("code:"+ str(response.status_code))
@@ -156,7 +155,8 @@ def mec_read_data() :
 				#print("content text:"+ str(response.text))
 				#print("******************")
 				Mec.stats.connection_ok += 1
-				Mec.stats.last_connection_errors = 0
+				if Mec.stats.last_connection_errors > 0:
+					Mec.stats.last_connection_errors = 0
 				mec_data_read_cb( jsonstr=response.json() )
 				return 0
 		except (requests.exceptions.HTTPError, requests.exceptions.RequestException):
@@ -208,7 +208,7 @@ def mec_update_cyclic(run_event) :
 
 	while run_event.is_set():
 		print("Thread: doing")
-		if dev_state > DevState.WaitForDevice:
+		if dev_state >= DevState.Connected:
 			push_statistics()
 			intervall = mec.get('/Mgmt/intervall')
 		else:
@@ -220,6 +220,7 @@ def mec_update_cyclic(run_event) :
 			Mec.stats.last_connection_errors = 0
 			Mec.stats.reconnect += 1
 			mec.set('/Connected', 0)
+			mec.invalidate()
 
 		if dev_state == DevState.WaitForDevice:
 			if mec_read_status(init=1) == 0:
@@ -227,6 +228,7 @@ def mec_update_cyclic(run_event) :
 		elif dev_state == DevState.Connect:
 			if mec_read_status(init=0) == 0:
 				dev_state = DevState.Connected
+				mec.validate()
 				mec.set('/Connected', 1)
 		elif dev_state == DevState.Connected:
 			mec_read_data()
