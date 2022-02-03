@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 #vi: set autoindent noexpandtab tabstop=4 shiftwidth=4
@@ -6,12 +6,21 @@
 import requests
 from requests.auth import HTTPBasicAuth
 import json
-from ConfigParser import SafeConfigParser
+try:
+	from ConfigParser import SafeConfigParser
+except:
+	from configparser import SafeConfigParser
 from venus_meter import VenusMeter
 
 from dbus.mainloop.glib import DBusGMainLoop
 import gobject
-from gobject import idle_add
+try:
+	import gobject
+	from gobject import idle_add
+except:
+	from gi.repository import GObject as gobject
+	from gi.repository.GObject import idle_add#
+
 import dbus
 import dbus.service
 import inspect
