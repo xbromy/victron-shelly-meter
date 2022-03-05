@@ -57,6 +57,7 @@ class Mec:
 
 global demo
 demo = 1
+ShellyIP = "192.168.3.15"
 global mec_is_init
 mec_is_init = 0
 global dev_state
@@ -119,7 +120,7 @@ def mec_parse_data( data ) :
       
       
 	#L1
-	URLL1 = "http://192.168.3.15/emeter/2"
+	URLL1 = "http://"+ShellyIP+"/emeter/2"
 	meter_rL1 = requests.get(url = URLL1, timeout=1)
 	meter_data_L1 = meter_rL1.json()
 	
@@ -134,7 +135,7 @@ def mec_parse_data( data ) :
 	meter_rL1.close
 
 	#L2
-	URLL2 = "http://192.168.3.15/emeter/1"
+	URLL2 = "http://"+ShellyIP+"/emeter/1"
 	meter_rL2 = requests.get(url = URLL2, timeout=1)
 	meter_data_L2 = meter_rL2.json()
 
@@ -149,7 +150,7 @@ def mec_parse_data( data ) :
 	meter_rL2.close
 
 	#L3
-	URLL3 = "http://192.168.3.15/emeter/0"
+	URLL3 = "http://"+ShellyIP+"/emeter/0"
 	meter_rL3 = requests.get(url = URLL3, timeout=1)
 	meter_data_L3 = meter_rL3.json()
 
