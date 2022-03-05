@@ -29,6 +29,8 @@ import os
 import sys
 import threading
 import time
+# Import datetime class from datetime module
+from datetime import datetime
 
 class DevState:
 	WaitForDevice = 0
@@ -54,7 +56,7 @@ class Mec:
 	max_retries = 10
 
 global demo
-demo = 0
+demo = 1
 global mec_is_init
 mec_is_init = 0
 global dev_state
@@ -95,7 +97,77 @@ def mec_parse_data( data ) :
 		#mec.set('/ProductName', str(jsonstr['hardware']))
 		mec_is_init = 1
 
-	time = data['TIME']
+	time = datetime.now() #data['TIME'] 
+
+	VoltageL1 = 0
+	CurrentL1 = 0
+	PowerL1 = 0
+	ForwardL1 = 0
+	ReverseL1 = 0
+	VoltageL2 = 0
+	CurrentL2 = 0
+	PowerL2 = 0
+	ForwardL2 = 0
+	ReverseL2 = 0
+	VoltageL3 = 0
+	CurrentL3 = 0
+	PowerL3 = 0
+	ForwardL3 = 0
+	ReverseL3 = 0
+	
+	
+      
+      
+	#L1
+	URLL1 = "http://192.168.3.15/emeter/2"
+	meter_rL1 = requests.get(url = URLL1, timeout=1)
+	meter_data_L1 = meter_rL1.json()
+	
+
+	VoltageL1 = float(meter_data_L1['voltage'])
+	CurrentL1 = float(meter_data_L1['current'])
+	PowerL1 = float(meter_data_L1['power'])
+
+	ForwardL1 = float(meter_data_L1['total'])
+	ReverseL1 = float(meter_data_L1['total_returned'])
+
+	meter_rL1.close
+
+	#L2
+	URLL2 = "http://192.168.3.15/emeter/1"
+	meter_rL2 = requests.get(url = URLL2, timeout=1)
+	meter_data_L2 = meter_rL2.json()
+
+
+	VoltageL2 = float(meter_data_L2['voltage'])
+	CurrentL2 = float(meter_data_L2['current'])
+	PowerL2 = float(meter_data_L2['power'])
+
+	ForwardL2 = float(meter_data_L2['total'])
+	ReverseL2 = float(meter_data_L2['total_returned'])
+
+	meter_rL2.close
+
+	#L3
+	URLL3 = "http://192.168.3.15/emeter/0"
+	meter_rL3 = requests.get(url = URLL3, timeout=1)
+	meter_data_L3 = meter_rL3.json()
+
+	VoltageL3 = float(meter_data_L3['voltage'])
+	CurrentL3 = float(meter_data_L3['current'])
+	PowerL3 = float(meter_data_L3['power'])
+
+	ForwardL3 = float(meter_data_L3['total'])
+	ReverseL3 = float(meter_data_L3['total_returned'])
+
+	meter_rL3.close
+
+	#total
+	Power = float(PowerL1+PowerL2+PowerL3)
+	Current = float(CurrentL1+CurrentL2+CurrentL3)
+	Forward = float(ForwardL1+ForwardL2+ForwardL3)
+	Reverse = float(ReverseL1+ReverseL2+ReverseL3)
+
 	if Mec.stats.last_time == time:
 		mec.inc('/stats/repeated_values')
 		mec.inc('/stats/last_repeated_values')
@@ -104,37 +176,37 @@ def mec_parse_data( data ) :
 		Mec.stats.last_time = time
 		mec.set('/stats/last_repeated_values', 0)
 
-		mec.set('/Ac/Power', (data['PT']))
-		mec.set('/Ac/Current', (data['IN0']), 1)
-		mec.set('/Ac/Voltage', (data['VT']))
-		mec.set('/Ac/L1/Current', (data['IA']), 1)
-		mec.set('/Ac/L1/Voltage', (data['VA']))
-		mec.set('/Ac/L1/Power', (data['PA']))
-		mec.set('/Ac/L2/Current', (data['IB']), 1)
-		mec.set('/Ac/L2/Voltage', (data['VB']))
-		mec.set('/Ac/L2/Power', (data['PB']))
-		mec.set('/Ac/L3/Current', (data['IC']), 1)
-		mec.set('/Ac/L3/Voltage', (data['VC']))
-		mec.set('/Ac/L3/Power', (data['PC']))
+		mec.set('/Ac/Power', (Power))
+		mec.set('/Ac/Current', (Current), 1)
+		mec.set('/Ac/Voltage', (VoltageL1))
+		mec.set('/Ac/L1/Current', (CurrentL1), 1)
+		mec.set('/Ac/L1/Voltage', (VoltageL1))
+		mec.set('/Ac/L1/Power', (PowerL1))
+		mec.set('/Ac/L2/Current', (CurrentL2), 1)
+		mec.set('/Ac/L2/Voltage', (VoltageL2))
+		mec.set('/Ac/L2/Power', (PowerL2))
+		mec.set('/Ac/L3/Current', (CurrentL3), 1)
+		mec.set('/Ac/L3/Voltage', (VoltageL3))
+		mec.set('/Ac/L3/Power', (PowerL3))
 
-		mec.set('/Ac/L1/Energy/Forward', (float(data['EFAA'])/1000), 2)
-		mec.set('/Ac/L1/Energy/Reverse', (float(data['ERAA'])/1000), 2)
-		mec.set('/Ac/L2/Energy/Forward', (float(data['EFAB'])/1000), 2)
-		mec.set('/Ac/L2/Energy/Reverse', (float(data['ERAB'])/1000), 2)
-		mec.set('/Ac/L3/Energy/Forward', (float(data['EFAC'])/1000), 2)
-		mec.set('/Ac/L3/Energy/Reverse', (float(data['ERAC'])/1000), 2)
+		mec.set('/Ac/L1/Energy/Forward', (float(ForwardL1)/1000), 2)
+		mec.set('/Ac/L1/Energy/Reverse', (float(ReverseL1)/1000), 2)
+		mec.set('/Ac/L2/Energy/Forward', (float(ForwardL2)/1000), 2)
+		mec.set('/Ac/L2/Energy/Reverse', (float(ReverseL2)/1000), 2)
+		mec.set('/Ac/L3/Energy/Forward', (float(ForwardL3)/1000), 2)
+		mec.set('/Ac/L3/Energy/Reverse', (float(ReverseL3)/1000), 2)
 
-		mec.set('/Ac/Energy/Forward', (float(data['EFAT'])/1000), 2)
-		mec.set('/Ac/Energy/Reverse', (float(data['ERAT'])/1000), 2)
+		mec.set('/Ac/Energy/Forward', (float(ForwardL1+ForwardL2+ForwardL3)/1000), 2)
+		mec.set('/Ac/Energy/Reverse', (float(ReverseL1+ReverseL2+ReverseL3)/1000), 2)
 
-		powertotal = data['PT']
+		powertotal = Power
 		print("++++++++++")
-		print("POWER Phase A: " + str(data['PA']) + "W")
-		print("POWER Phase B: " + str(data['PB']) + "W")
-		print("POWER Phase C: " + str(data['PC']) + "W")
-		print("POWER Total: " + str(data['PT']) + "W")
-		print("Time: " + str(data['TIME']) + "ms")
-		print("MEC Status: " + str(data['STATUS']))
+		print("POWER Phase A: " + str(PowerL1) + "W")
+		print("POWER Phase B: " + str(PowerL2) + "W")
+		print("POWER Phase C: " + str(PowerL3) + "W")
+		print("POWER Total: " + str(Power) + "W")
+		print("Time: " + str(time) + "ms")
+		print("MEC Status: " + str(1911))
 
 		#Mec.stats.parse_error += 1
 
@@ -152,22 +224,24 @@ def mec_read_data() :
 	global demo
 
 	err = 0
-	if demo == 0:
+	if demo == 1:
 		try:
-			response = requests.get( Mec.url, verify=False, auth=HTTPBasicAuth(Mec.user, Mec.password), timeout=2)
+			#response = requests.get( Mec.url, verify=False, auth=HTTPBasicAuth(Mec.user, Mec.password), timeout=2)
 			# For successful API call, response code will be 200 (OK)
-			if(response.ok):
+			#if(response.ok):
 				#print("code:"+ str(response.status_code))
 				#print("******************")
 				#print("headers:"+ str(response.headers))
 				#print("******************")
 				#print("content text:"+ str(response.text))
 				#print("******************")
-				Mec.stats.connection_ok += 1
-				if Mec.stats.last_connection_errors > 0:
-					Mec.stats.last_connection_errors = 0
-				mec_data_read_cb( jsonstr=response.json() )
-				return 0
+			Mec.stats.connection_ok += 1
+			if Mec.stats.last_connection_errors > 0:
+				Mec.stats.last_connection_errors = 0
+			
+			data = mec_read_example("example_mec_data.json")
+			mec_data_read_cb( data )
+			return 0
 		except (requests.exceptions.HTTPError, requests.exceptions.RequestException):
 			print('Error reading from ' + Mec.url)
 			Mec.stats.connection_ko += 1
